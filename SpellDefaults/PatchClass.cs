@@ -59,7 +59,7 @@ public class PatchClass
     #endregion
 
     #region Start/Shutdown
-    public void Start()
+    public async void Start()
     {
         //Need to decide on async use
         Mod.State = ModState.Loading;
@@ -71,7 +71,8 @@ public class PatchClass
             return;
         }
 
-        SetupSpells();
+        await RunOnStartup();
+
         Mod.State = ModState.Running;
     }
 
@@ -87,6 +88,19 @@ public class PatchClass
             ModManager.Log($"Improper shutdown: {Mod.ModPath}", ModManager.LogLevel.Error);
     }
     #endregion
+
+    static async Task RunOnStartup()
+    {
+        while(true)
+        {
+            if(WorldManager.WorldStatus == WorldManager.WorldStatusState.Open)
+            {
+                SetupSpells();
+                break;
+            }
+            await Task.Delay(1000);
+        }
+    }
 
     private static void SetupSpells()
     {
