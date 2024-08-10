@@ -1,4 +1,5 @@
-﻿//extern alias Json;
+﻿#define REALM
+//extern alias Json;
 global using ACE.Common;
 global using ACE.Common.Extensions;
 global using ACE.Database.Models.Shard;

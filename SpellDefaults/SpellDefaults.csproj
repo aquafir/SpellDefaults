@@ -18,22 +18,16 @@
 		<None Remove=".template.config\**" />
 	</ItemGroup>
 
+	<PropertyGroup>
+		<PublicizerClearCacheOnClean>true</PublicizerClearCacheOnClean>
+	</PropertyGroup>
+
 	<!--<PropertyGroup>
-		<PublicizerLogFilePath>logfile</PublicizerLogFilePath>
+		<PublicizeAll>true</PublicizeAll>
 	</PropertyGroup>-->
 
-	<ItemGroup>
-		<!-- All members in an assembly -->
+	<ItemGroup>		
 		<Publicize Include="ACE.DatLoader:ACE.DatLoader.Entity.SpellBase.Duration" />
-
-		<!-- Field -->
-		<!--<Publicize Include="MyAssemblyFileName:MyNamespace.MyType.myField" />-->
-
-		<!-- Property -->
-		<!--<Publicize Include="MyAssemblyFileName:MyNamespace.MyType.MyProperty" />-->
-
-		<!-- Method -->
-		<!--<Publicize Include="MyAssemblyFileName:MyNamespace.MyType.MyMethod" />-->
 	</ItemGroup>
 
 	<ItemGroup>

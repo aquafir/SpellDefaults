@@ -1,4 +1,6 @@
-﻿namespace SpellDefaults;
+﻿using ACE.DatLoader.FileTypes;
+
+namespace SpellDefaults;
 
 [HarmonyPatch]
 public class PatchClass
@@ -91,9 +93,9 @@ public class PatchClass
 
     static async Task RunOnStartup()
     {
-        while(true)
+        while (true)
         {
-            if(WorldManager.WorldStatus == WorldManager.WorldStatusState.Open)
+            if (WorldManager.WorldStatus == WorldManager.WorldStatusState.Open)
             {
                 SetupSpells();
                 break;
@@ -111,12 +113,110 @@ public class PatchClass
 
             spellBase.Duration = Settings.Duration;
         }
+
+        OverrideSpellSets();
     }
 
-    [CommandHandler("setup-spells", AccessLevel.Developer, CommandHandlerFlag.None)]
-    public static void HandleSetupSpells(ISession session, params string[] parameters)
+    private static void OverrideSpellSets()
     {
-        SetupSpells();
+        try
+        {
+            foreach (var setOverride in Settings.Sets)
+            {
+                var key = (uint)setOverride.Key;
+
+                //Add missing sets
+                if (!DatManager.PortalDat.SpellTable.SpellSet.TryGetValue(key, out var datSet))
+                {
+                    datSet = new();
+                    DatManager.PortalDat.SpellTable.SpellSet.Add(key, datSet);
+                }
+
+                //Order overriding sets by tier
+                var tiers = setOverride.Value.OrderBy(x => x.NumEquipped);
+                var start = tiers.FirstOrDefault().NumEquipped;
+                var end = tiers.LastOrDefault().NumEquipped;
+
+                //Clear sets
+                datSet.SpellSetTiers.Clear();
+                datSet.SpellSetTiersNoGaps.Clear();
+                datSet.HighestTier = end;
+
+                foreach (var tier in tiers)
+                {
+                    //Make and add SpellSetTier
+                    SpellSetTiers sst = new() { Spells = tier.Spells.Select(x => (uint)x).ToList() };
+                    datSet.SpellSetTiers.TryAdd(tier.NumEquipped, sst);
+                }
+
+                //Create the no-gaps list using ACE logic.  Could be improved
+                SpellSetTiers lastSpellSetTier = null;
+                for (uint i = 0; i <= datSet.HighestTier; i++)
+                {
+                    if (datSet.SpellSetTiers.TryGetValue(i, out var spellSetTiers))
+                        lastSpellSetTier = spellSetTiers;
+
+                    if (lastSpellSetTier != null)
+                        datSet.SpellSetTiersNoGaps.TryAdd(i, lastSpellSetTier);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ModManager.Log(ex.Message, ModManager.LogLevel.Error);
+            return;
+        }
+
+        ModManager.Log($"Replaced {Settings.Sets.Count} EquipmentSets with a combined {Settings.Sets.Sum(x => x.Value.Count())} tiers and {Settings.Sets.Values.Select(y => y.Sum(z => z.Spells.Count()))}");
+    }
+
+    [CommandHandler("listset", AccessLevel.Player, CommandHandlerFlag.None)]
+    public static void HandleSS(Session session, params string[] parameters)
+    {
+        var p = session.Player;
+        var s = GetLastAppraisedObject(session);
+
+        if (s is null || s.EquipmentSetId is null)
+            return;
+
+        if (!DatManager.PortalDat.SpellTable.SpellSet.TryGetValue((uint)s.EquipmentSetId, out var set))
+            return;
+
+        //ACE.Server.Entity.SpellSet loads from DatManager.PortalDat.SpellTable.SpellSet
+        var sb = new StringBuilder($"\nEquipmentSet {s.EquipmentSetId}:");
+        foreach (var tier in set.SpellSetTiersNoGaps)
+        {
+            sb.Append($"\nWearing >= {tier.Key}");
+            foreach (var spellId in tier.Value.Spells)
+            {
+                Spell spell = new Spell(spellId);
+                sb.Append($"\n  ({spellId}) {spell.Name}");
+            }
+        }
+        p.SendMessage($"{sb}");
+    }
+
+    //[CommandHandler("setup-spells", AccessLevel.Developer, CommandHandlerFlag.None)]
+    //public static void HandleSetupSpells(Session session, params string[] parameters)
+    //{
+    //    SetupSpells();
+    //}
+
+    //Lazy helper
+    public static WorldObject GetLastAppraisedObject(Session session)
+    {
+        var targetID = session.Player.RequestedAppraisalTarget;
+        if (targetID == null)
+        {
+            return null;
+        }
+
+        var target = session.Player.FindObject(targetID.Value, Player.SearchLocations.Everywhere, out _, out _, out _);
+        if (target == null)
+        {
+            return null;
+        }
+        return target;
     }
 }
 
